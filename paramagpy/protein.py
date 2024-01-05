@@ -4,6 +4,8 @@ from Bio.PDB.Atom import Atom, DisorderedAtom
 from Bio.PDB.StructureBuilder import StructureBuilder
 from Bio.PDB.Polypeptide import standard_aa_names
 import numpy as np
+import collections
+import os.path
 
 # Datatypes for numpy structured arrays after parsing 
 EXPDATA_DTYPE = {
@@ -455,6 +457,122 @@ def load_pdb(fileName, ident=None):
 	parser = PDBParser(structure_builder=CustomStructureBuilder())
 	return parser.get_structure(ident, fileName)
 
+
+# Added for xyz coordinates
+### Source: https://stackoverflow.com/questions/38770606/finding-patterns-in-list
+def pattern(seq, nlig):
+        storage = {}
+        for length in range(1,int(len(seq)/nlig)+1-2): # Change for different ligands
+                valid_strings = {}
+                for start in range(0,len(seq)-length+1):
+                        valid_strings[start] = tuple(seq[start:start+length])
+                candidates = set(valid_strings.values())
+                if len(candidates) != len(valid_strings):
+                        #print("Pattern found for " + str(length))
+                        storage = valid_strings
+                else:
+                        #print("No pattern found for " + str(length))
+                        break
+        return set(v for v in storage.values() if (list(storage.values()).count(v) > 1))
+
+
+# Added for xyz coordinates
+def convert_xyz(fileName, ident=None):
+	"""
+	Convert XYZ file into PDB file
+
+	Parameters
+	----------
+	fileName : str
+		the path to the file
+	ident : str (optional)
+		the desired identity of the structure object
+
+	Returns
+	-------
+	values : :class:`paramagpy.protein.CustomStructure`
+		a structure object containing the atomic coordinates
+	"""
+
+	class Atom:
+		"""
+		Class with atom properties
+		"""
+		def __init__(self, atom, x, y, z):
+			self.atom = atom
+			self.x = float(x)
+			self.y = float(y)
+			self.z = float(z)
+			self.res = 1
+			self.label = atom
+			self.label_ren = atom
+
+	# Open XYZ file and load lines
+	with open(fileName, "r") as xyz:
+		xyz_lines = xyz.readlines()
+
+	# Filter first nonatom lines and load atom info
+	rows = list()
+	atoms = list()
+	i = 0
+	for line in xyz_lines:
+		if len(line.split()) == 4:
+			i += 1
+			atom, x, y, z = line.split()
+			rows.append(Atom(atom, x, y, z))
+			atoms.append(atom)
+	
+	# Find pattern in atoms
+	patt = pattern(atoms, 6) # change values for different ligands, MUSIM ZMENI, AT JE TO OBECNE
+	for pat in patt:
+		if pat[0] == "N":
+			ligand = pat
+			#print(ligand)
+	
+	# Process atom labeling
+	distinct_atoms = dict()
+	residuum = 1 
+	for i, row in enumerate(rows):
+		# If current atom can be the start of the pattern
+		if row.atom in ligand:
+			lig_eq = True
+
+			# Check wheter the atom is start of pattern
+			try:
+				for j, at in enumerate(ligand):
+					if not at == rows[i+j].atom:
+						lig_eq = False
+			except:
+				lig_eq = False
+			
+			# If start of pattern, reset atom label count and start new residue
+			if lig_eq == True:
+				residuum += 1
+				for x in distinct_atoms:
+					if x in ligand:
+						distinct_atoms[x] = 0
+
+		# Add new atoms to dictionary
+		if row.atom not in distinct_atoms:
+			distinct_atoms.update({row.atom: 1})
+
+		# If already present, change their count
+		else:
+			distinct_atoms[row.atom] = distinct_atoms[row.atom] + 1
+
+		# Finally, change the labels accordingly        
+		rows[i].label += str(distinct_atoms[row.atom])
+		rows[i].res = residuum
+
+	# Create PDB output file
+	output_pdb = fileName.rpartition(".")[0] + ".pdb"
+	if os.path.exists(output_pdb):
+		return output_pdb, 1
+	with open(output_pdb, "w") as pdb:
+		for i, row in enumerate(rows):
+			pdb.write("{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {:>2s}{:2s}\n".format(
+				"ATOM", i+1, row.label, " ", "SER", "X", row.res, "", row.x, row.y, row.z, 1.00, 0.00, row.atom, ""))
+		return output_pdb, 0
 
 
 class PyMolScript(object):

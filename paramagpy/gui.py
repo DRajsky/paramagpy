@@ -2645,8 +2645,13 @@ class PDBFrame(tk.LabelFrame):
 		Tooltip(b, tt['read_pdb'])
 		b.grid(row=0,column=0,sticky='EW')
 
+		# Added for xyz coordinates
+		b = ttk.Button(self, text='Convert XYZ file',command=self.convert_xyz)
+		Tooltip(b, tt['convert_xyz'])
+		b.grid(row=0,column=1,sticky='EW')
+
 		self.lbl_pdb_file = tk.Label(self,text=" "*self.num_chars)
-		self.lbl_pdb_file.grid(row=0,column=1)
+		self.lbl_pdb_file.grid(row=0,column=2)
 
 		ttk.Separator(self, orient='vertical').grid(
 			row=0,column=2,rowspan=2,sticky='NS',padx=3)
@@ -2703,6 +2708,27 @@ class PDBFrame(tk.LabelFrame):
 			self.prot = protein.load_pdb(fileName)
 			self.lbl_pdb_file.config(
 				text=format_path(fileName, self.num_chars))
+			self.parse_models()
+
+	# Added for xyz coordinates
+	def convert_xyz(self):
+		"""Open fild dialog to fetch the XYZ file path, load and parse"""
+		fileName = filedialog.askopenfilename(
+			title="Choose XYZ file",
+			defaultextension='.xyz',
+			filetypes=[('XYZ file','.xyz'),('All files','.*')])
+
+		if fileName:
+			output_pdb, state = protein.convert_xyz(fileName)
+			print(output_pdb, state)
+			while state != 0:
+				print("File already exists, will delete it")
+				os.remove(output_pdb)
+				output_pdb, state = protein.convert_xyz(fileName)
+				print(output_pdb, state)
+			self.prot = protein.load_pdb(output_pdb)
+			self.lbl_pdb_file.config(
+				text=format_path(output_pdb, self.num_chars))
 			self.parse_models()
 
 	def parse_models(self):
@@ -2807,6 +2833,7 @@ class MainGui(tk.Frame):
 
 tooltips_raw = """
 read_pdb : Load a PDB file containing protein coordinates for all atoms
+convert_xyz : Convert a XYZ file into PDB while searching for any possible ligands
 select_models : Select models to be used during fitting. This can be specified using printer-style formatting e.g. '1,3,7' or '1-5' or '1-5,7,9'. Be sure to click the "Parse models" button before continuing.
 parse_models : Selects only the desired models from the PDB file
 selection : Select the atoms and residues to be used during fitting
