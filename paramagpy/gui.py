@@ -1892,7 +1892,7 @@ class FittingOptionsFrame(tk.LabelFrame):
 
 		if self.dtype=='PCS':
 			self.set_checkbox('ref', 0, 0, 1, 0)
-			self.set_checkbox('pos', 1, 0, 1)
+			self.set_checkbox('pos', 1, 0, 1, 0)
 			self.set_checkbox('eav', 2, 0, 1, 0)
 			ttk.Separator(self,orient='vertical').grid(
 				row=0,column=1,rowspan=3,sticky='ns')
@@ -2697,6 +2697,13 @@ class PDBFrame(tk.LabelFrame):
 		self.atom_selection = set(self.default_atom_selection)
 		self.resi_selection = set(self.default_resi_selection)
 
+	def read_file(self, fileName):
+		"""Load and parse the PDB file"""
+		self.prot = protein.load_pdb(fileName)
+		self.lbl_pdb_file.config(
+			text=format_path(fileName, self.num_chars))
+		self.parse_models()
+
 	def read_pdb(self):
 		"""Open file dialog to fetch the PDB file path, load and parse"""
 		fileName = filedialog.askopenfilename(
@@ -2705,12 +2712,8 @@ class PDBFrame(tk.LabelFrame):
 			filetypes=[('PDB file','.pdb'),('All files','.*')])
 
 		if fileName:
-			self.prot = protein.load_pdb(fileName)
-			self.lbl_pdb_file.config(
-				text=format_path(fileName, self.num_chars))
-			self.parse_models()
-
-
+			self.read_file(fileName)
+			
 	# Added for xyz coordinates
 	def convert_xyz(self):
 		"""Open file dialog to fetch the XYZ file path, load and parse"""
@@ -2729,11 +2732,7 @@ class PDBFrame(tk.LabelFrame):
 					return
 
 			if messagebox.askokcancel(title="Confirmation", message="Do you want to load the PDB file?"):
-				self.prot = protein.load_pdb(output_pdb)
-				self.lbl_pdb_file.config(
-					text=format_path(output_pdb, self.num_chars))
-				self.parse_models()
-
+				self.read_file(output_pdb)
 
 	def parse_models(self):
 		"""
