@@ -2698,7 +2698,7 @@ class PDBFrame(tk.LabelFrame):
 		self.resi_selection = set(self.default_resi_selection)
 
 	def read_pdb(self):
-		"""Open fild dialog to fetch the PDB file path, load and parse"""
+		"""Open file dialog to fetch the PDB file path, load and parse"""
 		fileName = filedialog.askopenfilename(
 			title="Choose PDB file",
 			defaultextension='.pdb',
@@ -2710,9 +2710,10 @@ class PDBFrame(tk.LabelFrame):
 				text=format_path(fileName, self.num_chars))
 			self.parse_models()
 
+
 	# Added for xyz coordinates
 	def convert_xyz(self):
-		"""Open fild dialog to fetch the XYZ file path, load and parse"""
+		"""Open file dialog to fetch the XYZ file path, load and parse"""
 		fileName = filedialog.askopenfilename(
 			title="Choose XYZ file",
 			defaultextension='.xyz',
@@ -2720,16 +2721,19 @@ class PDBFrame(tk.LabelFrame):
 
 		if fileName:
 			output_pdb, state = protein.convert_xyz(fileName)
-			print(output_pdb, state)
 			while state != 0:
-				print("File already exists, will delete it")
-				os.remove(output_pdb)
-				output_pdb, state = protein.convert_xyz(fileName)
-				print(output_pdb, state)
-			self.prot = protein.load_pdb(output_pdb)
-			self.lbl_pdb_file.config(
-				text=format_path(output_pdb, self.num_chars))
-			self.parse_models()
+				if messagebox.askokcancel(title="Confirmation", message="PDB file already exists. Do you want to rewrite it?"):
+					os.remove(output_pdb)
+					output_pdb, state = protein.convert_xyz(fileName)
+				else:
+					return
+
+			if messagebox.askokcancel(title="Confirmation", message="Do you want to load the PDB file?"):
+				self.prot = protein.load_pdb(output_pdb)
+				self.lbl_pdb_file.config(
+					text=format_path(output_pdb, self.num_chars))
+				self.parse_models()
+
 
 	def parse_models(self):
 		"""
