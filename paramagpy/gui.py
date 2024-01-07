@@ -716,8 +716,22 @@ class SelectionPopup(Popup):
 			ttk.Checkbutton(self, text=residue,variable=self.residues[residue]
 				).grid(row=i%4+1,column=2+i//4, sticky='W',padx=4)
 
-		ttk.Button(self, text='Cancel', command=self.death).grid(row=5,column=2)
-		ttk.Button(self, text='Save', command=self.save).grid(row=5,column=5)
+		ttk.Separator(self, orient='horizontal').grid(
+			row=5,column=2,columnspan=6,sticky='WE')
+
+		tk.Label(self, text="Sequence:").grid(row=6,column=2,columnspan=2,sticky='W')
+		self.sequences = {}
+		for i in range(1,10):
+			if i in parent.seq_selection:
+				value = True
+			else:
+				value = False
+			self.sequences[i] = tk.BooleanVar(value=value)
+			ttk.Checkbutton(self, text=str(i),variable=self.sequences[i]
+				).grid(row=(i-1)%3+7,column=2+(i-1)//3, sticky='W',padx=4)
+
+		ttk.Button(self, text='Cancel', command=self.death).grid(row=10,column=2)
+		ttk.Button(self, text='Save', command=self.save).grid(row=10,column=5)
 		self.update()
 
 	def save(self):
@@ -725,6 +739,8 @@ class SelectionPopup(Popup):
 			[i for i,j in self.atoms.items() if j.get()])
 		self.parent.resi_selection = set(
 			[i for i,j in self.residues.items() if j.get()])
+		self.parent.seq_selection = set(
+			[i for i,j in self.sequences.items() if j.get()])
 		self.parent.update_views(2)
 		self.death()
 
@@ -1654,6 +1670,8 @@ class DataTab(tk.Frame):
 		data = self.parent.parent.parent.templates[self.dtype]
 		atom_selection = self.frm_pdb.atom_selection
 		resi_selection = self.frm_pdb.resi_selection
+		seq_selection = self.frm_pdb.seq_selection
+
 		if data is not None:
 			self.data = data.copy()
 		else:
@@ -1671,7 +1689,8 @@ class DataTab(tk.Frame):
 					usedKeys.add(key)
 					row['exp'] = exp
 					row['err'] = err
-					if atom.element in atom_selection and res in resi_selection:
+					if ((atm in atom_selection) and 
+						(res in resi_selection) and (seq in seq_selection)):
 						row['use'] = True
 
 			unused = set(self.loadData.data) - usedKeys
@@ -1696,16 +1715,20 @@ class DataTab(tk.Frame):
 				return
 			pdata = self.frm_pdb.prot.parse(expdata)
 			df = []
+			#tohle se nespousti
 			for r in pdata:
 				
 				if r['mdl'] not in self.frm_pdb.models:
 					continue
 
 				res1 = r['atm'].parent.resname
+				print(res1)
+				print(r['atm'].parent.id)
 				res2 = r['atx'].parent.resname
 				row = (r['mdl'], True, r['atm'], r['atx'], np.nan, r['exp'], r['err'], r['idx'])
 
-				if r['atm'].element in atom_selection and res1 in resi_selection:
+				if (r['atm'].element in atom_selection and
+				 res1 in resi_selection):
 					if r['atx'].element in atom_selection and res2 in resi_selection:
 						df.append(row)
 			self.data = np.array(df, dtype=dtype)
@@ -2650,9 +2673,11 @@ class PDBFrame(tk.LabelFrame):
 
 		self.default_atom_selection = ['H','N','C','O']
 		self.default_resi_selection = list(protein.standard_aa_names)
+		self.default_seq_selection = list(range(1,10))
 
 		self.atom_selection = set(self.default_atom_selection)
 		self.resi_selection = set(self.default_resi_selection)
+		self.seq_selection = set(self.default_seq_selection)
 		self.reset_selection()
 
 		b = ttk.Button(self, text='Read PDB file',command=self.read_pdb)
@@ -2710,6 +2735,7 @@ class PDBFrame(tk.LabelFrame):
 	def reset_selection(self):
 		self.atom_selection = set(self.default_atom_selection)
 		self.resi_selection = set(self.default_resi_selection)
+		self.seq_selection = set(self.default_seq_selection)
 
 	def read_file(self, fileName):
 		"""Load and parse the PDB file"""
