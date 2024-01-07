@@ -691,7 +691,7 @@ class SelectionPopup(Popup):
 	def __init__(self, parent):
 		title = "Atoms and residues for fitting"
 		super().__init__(parent, title)
-		tk.Label(self, text="Atom:").grid(row=0,column=0,sticky='W')
+		tk.Label(self, text="Atom:").grid(row=0,column=0,columnspan=2,sticky='W')
 		self.atoms = {}
 		for i, atom in enumerate(self.parent.default_atom_selection):
 			if atom in parent.atom_selection:
@@ -700,12 +700,15 @@ class SelectionPopup(Popup):
 				value = False
 			self.atoms[atom] = tk.BooleanVar(value=value)
 			ttk.Checkbutton(self, text=atom,variable=self.atoms[atom]
-				).grid(row=i+1,column=0, sticky='W')
+				).grid(row=1,column=0+i, sticky='W')
+
+		ttk.Separator(self, orient='horizontal').grid(
+			row=2,column=0,columnspan=len(self.atoms),sticky='WE')
 
 		ttk.Separator(self, orient='vertical').grid(
-			row=1,column=1,rowspan=len(self.atoms)+1,sticky='NS')
+			row=0,column=len(self.atoms),rowspan=len(self.atoms)+1,sticky='NS')
 
-		tk.Label(self, text="Residue:").grid(row=0,column=2,columnspan=2,sticky='W')
+		tk.Label(self, text="Residue:").grid(row=0,column=len(self.atoms)+1,columnspan=2,sticky='W')
 		self.residues = {}
 		for i, residue in enumerate(protein.standard_aa_names):
 			if residue in parent.resi_selection:
@@ -714,12 +717,12 @@ class SelectionPopup(Popup):
 				value = False
 			self.residues[residue] = tk.BooleanVar(value=value)
 			ttk.Checkbutton(self, text=residue,variable=self.residues[residue]
-				).grid(row=i%4+1,column=2+i//4, sticky='W',padx=4)
+				).grid(row=i%4+1,column=len(self.atoms)+1+i//4, sticky='W',padx=4)
 
 		ttk.Separator(self, orient='horizontal').grid(
-			row=5,column=2,columnspan=6,sticky='WE')
+			row=5,column=len(self.atoms)+1,columnspan=6,sticky='WE')
 
-		tk.Label(self, text="Sequence:").grid(row=6,column=2,columnspan=2,sticky='W')
+		tk.Label(self, text="Sequence:").grid(row=6,column=len(self.atoms)+1,columnspan=2,sticky='W')
 		self.sequences = {}
 		for i in range(1,10):
 			if i in parent.seq_selection:
@@ -728,10 +731,10 @@ class SelectionPopup(Popup):
 				value = False
 			self.sequences[i] = tk.BooleanVar(value=value)
 			ttk.Checkbutton(self, text=str(i),variable=self.sequences[i]
-				).grid(row=(i-1)%3+7,column=2+(i-1)//3, sticky='W',padx=4)
+				).grid(row=(i-1)%3+7,column=len(self.atoms)+1+(i-1)//3, sticky='W',padx=4)
 
-		ttk.Button(self, text='Cancel', command=self.death).grid(row=10,column=2)
-		ttk.Button(self, text='Save', command=self.save).grid(row=10,column=5)
+		ttk.Button(self, text='Cancel', command=self.death).grid(row=10,column=len(self.atoms)+1)
+		ttk.Button(self, text='Save', command=self.save).grid(row=10,column=len(self.atoms)+4)
 		self.update()
 
 	def save(self):
@@ -1689,7 +1692,7 @@ class DataTab(tk.Frame):
 					usedKeys.add(key)
 					row['exp'] = exp
 					row['err'] = err
-					if ((atm in atom_selection) and 
+					if ((atom.element in atom_selection) and 
 						(res in resi_selection) and (seq in seq_selection)):
 						row['use'] = True
 
@@ -1715,7 +1718,7 @@ class DataTab(tk.Frame):
 				return
 			pdata = self.frm_pdb.prot.parse(expdata)
 			df = []
-			#tohle se nespousti
+
 			for r in pdata:
 				
 				if r['mdl'] not in self.frm_pdb.models:
@@ -2590,7 +2593,7 @@ class MethodsNotebook(ttk.Notebook):
 				(m, False, a, nan, nan, nan, a.serial_number))
 			templates['RDC'].append(
 				(m, False, a, None, nan, nan, nan, a.serial_number))
-			self.atomSet.add(a.name)
+			self.atomSet.add(a.element)
 
 		for dtype in self.dtypes:
 			template = np.array(templates[dtype], dtype=self.structdtype[dtype])
