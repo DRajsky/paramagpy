@@ -31,7 +31,7 @@ setuptools.setup(
 	author_email='henry.orton@anu.edu.au',
 	license='GNU GPLv3+',
 	packages=setuptools.find_packages(),
-	install_requires=['numpy', 'scipy','matplotlib','biopython'],
+	install_requires=['numpy', 'scipy','matplotlib','biopython', 'adjustText'],
 	zip_safe=False,
 	package_data={'paramagpy': ['paramagpy/icon.gif']},
 	include_package_data = True,
