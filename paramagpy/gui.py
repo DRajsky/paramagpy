@@ -6,6 +6,8 @@ import numpy as np
 import os, sys, subprocess, shutil
 from pprint import pprint
 from collections import OrderedDict
+from math import sqrt
+from adjustText import adjust_text # For rearranging graph texts: https://github.com/Phlya/adjustText/wiki
 
 import paramagpy
 from paramagpy import metal, fit, protein, dataparse
@@ -503,7 +505,7 @@ class PlotCorrelationPopup(Popup):
 		chk = ttk.Checkbutton(self.frm_opt, text="Include Tensor info.",
 			variable=self.params['inf']).grid(row=1,column=2, sticky='W')
 
-		self.params['ann'] = tk.IntVar(value=0)
+		self.params['ann'] = tk.IntVar(value=1)
 		chk = ttk.Checkbutton(self.frm_opt, text="Include Atom info.",
 			variable=self.params['ann']).grid(row=2,column=2, sticky='W')
 
@@ -534,10 +536,18 @@ class PlotCorrelationPopup(Popup):
 	def format_coord(x, y):
 		return "Exp: {0:5.2f}, Cal:{1:5.2f}".format(x, y)
 
+	# Calculating RMSD from measured/calculated PCSs
+	def rmsdCalc(self, d):
+		rmsd = float()
+		for atom in d:
+			rmsd = rmsd + (atom['exp'] - atom['cal'])**2
+		rmsd = sqrt(rmsd/len(d))
+		return rmsd
+
 	def plot(self):
 		self.axes.clear()
-		self.axes.set_xlabel("Experiment")
-		self.axes.set_ylabel("Calculated")
+		self.axes.set_xlabel("Experiment [ppm]")
+		self.axes.set_ylabel("Calculated [ppm]")
 		self.axes.format_coord = self.format_coord
 
 		minig, maxig = None, None
@@ -560,15 +570,26 @@ class PlotCorrelationPopup(Popup):
 				minig = mini
 			if maxi < maxig:
 				maxig = maxi
+
+			statlabel = "Q-factor = {:5.4f}\nRMSD = {:5.4f}".format(fit.qfactor(d), self.rmsdCalc(d))
 				
-			self.axes.errorbar(d['exp'],d['cal'],xerr=d['err'],marker='o', 
-				lw=0, elinewidth=1, ms=3, label=tab.name, color=tab.colour.colour)
+			erbar = self.axes.errorbar(d['exp'],d['cal'],xerr=d['err'],marker='o', 
+				lw=0, elinewidth=1, ms=3, label=statlabel, color=tab.colour.colour)
+
+			scale = 1.1
+			self.axes.plot([minig*scale,maxig*scale], 
+						   [minig*scale,maxig*scale], '-k', lw=0.5, zorder=0)
+			self.axes.set_xlim(minig*scale, maxig*scale)
+			self.axes.set_ylim(minig*scale, maxig*scale)
+			self.axes.set_aspect(1.0)
 
 			if self.params['ann'].get():
+				texts = []
 				for atom, exp, cal in d[['atm','exp','cal']]:
 					_, mdl, chn, (_, seq, _), (atm, _) = atom.get_full_id()
-					s = "{}{}".format(atm,seq)
-					self.axes.annotate(s, xy=(exp, cal), fontsize=8)
+					lab = str(seq)+"-"+atm
+					texts.append(self.axes.text(exp, cal, lab, fontsize=8, ha='center', va='center'))
+				adjust_text(texts, d['exp'], d['cal'], arrowprops=dict(arrowstyle='->', color='red', lw=0.5))
 
 			if self.params['leg'].get():
 				self.axes.legend(bbox_to_anchor=(0.95,0.05), loc="lower right")
@@ -579,13 +600,6 @@ class PlotCorrelationPopup(Popup):
 					bbox={'facecolor':'white', 'pad':2},
 					transform=self.axes.transAxes, horizontalalignment='left', 
 					verticalalignment='top')
-
-			scale = 1.1
-			self.axes.plot([minig*scale,maxig*scale], 
-						   [minig*scale,maxig*scale], '-k', lw=0.5, zorder=0)
-			self.axes.set_xlim(minig*scale, maxig*scale)
-			self.axes.set_ylim(minig*scale, maxig*scale)
-			self.axes.set_aspect(1.0)
 
 		self.canvas.draw()
 
