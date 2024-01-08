@@ -8,6 +8,7 @@ from pprint import pprint
 from collections import OrderedDict
 from math import sqrt
 from adjustText import adjust_text # For rearranging graph texts: https://github.com/Phlya/adjustText/wiki
+import re
 
 import paramagpy
 from paramagpy import metal, fit, protein, dataparse
@@ -693,20 +694,56 @@ class SelectionPopup(Popup):
 		super().__init__(parent, title)
 		tk.Label(self, text="Atom:").grid(row=0,column=0,columnspan=2,sticky='W')
 		self.atoms = {}
+		self.atoms_nonordered = {}
+		self.atoms_order = list()
 		for i, atom in enumerate(self.parent.default_atom_selection):
 			if atom in parent.atom_selection:
 				value = True
 			else:
 				value = False
+			number = protein.get_atomic_number(atom)
 			self.atoms[atom] = tk.BooleanVar(value=value)
-			ttk.Checkbutton(self, text=atom,variable=self.atoms[atom]
-				).grid(row=1,column=0+i, sticky='W')
+			self.atoms_order.append(number)
+			self.atoms_nonordered[number] = self.atoms[atom], atom
+		self.atoms_order.sort()
+		for i, x in enumerate(self.atoms_order):
+			ttk.Checkbutton(self, text=self.atoms_nonordered[x][1],variable=self.atoms_nonordered[x][0]
+				).grid(row=1,column=i, sticky='W')
 
 		ttk.Separator(self, orient='horizontal').grid(
 			row=2,column=0,columnspan=len(self.atoms),sticky='WE')
 
-		ttk.Separator(self, orient='vertical').grid(
-			row=0,column=len(self.atoms),rowspan=len(self.atoms)+1,sticky='NS')
+		self.atoms_uniq = {}
+		self.atoms_uniq_nonordered = {}
+		self.max_row_len = 0
+		for i, atom_uniq in enumerate(self.parent.default_atom_uniq_selection):
+			if atom_uniq in parent.atom_uniq_selection:
+				value = True
+			else:
+				value = False
+
+			# Splits atom id into atom name and id number
+			proc_name = re.split('(\d+)',atom_uniq)
+			number = protein.get_atomic_number(proc_name[0])
+			self.atoms_uniq[atom_uniq] = tk.BooleanVar(value=value)
+			if len(proc_name) == 1:
+				proc_name.append(0)
+				proc_name.append('')
+			if number not in self.atoms_uniq_nonordered:
+				self.atoms_uniq_nonordered[number] = {}
+			self.atoms_uniq_nonordered[number].update({int(proc_name[1]) : self.atoms_uniq[atom_uniq]})
+		for i, x in enumerate(self.atoms_order):
+			order = list()
+			for y in self.atoms_uniq_nonordered[x]:
+				order.append(y)
+			order.sort()
+			for j, y in enumerate(order):
+				if 3+j > self.max_row_len:
+					self.max_row_len = 3+j
+				ttk.Checkbutton(self, text=y,variable=self.atoms_uniq_nonordered[x][y]
+					).grid(row=3+j,column=i, sticky='W')
+
+
 
 		tk.Label(self, text="Residue:").grid(row=0,column=len(self.atoms)+1,columnspan=2,sticky='W')
 		self.residues = {}
@@ -733,13 +770,22 @@ class SelectionPopup(Popup):
 			ttk.Checkbutton(self, text=str(i),variable=self.sequences[i]
 				).grid(row=(i-1)%3+7,column=len(self.atoms)+1+(i-1)//3, sticky='W',padx=4)
 
-		ttk.Button(self, text='Cancel', command=self.death).grid(row=10,column=len(self.atoms)+1)
-		ttk.Button(self, text='Save', command=self.save).grid(row=10,column=len(self.atoms)+4)
+		if len(self.sequences)+1 > self.max_row_len:
+			self.max_row_len = len(self.sequences)+1
+
+		ttk.Button(self, text='Cancel', command=self.death).grid(row=self.max_row_len,column=len(self.atoms)+1,columnspan=2)
+		ttk.Button(self, text='Save', command=self.save).grid(row=self.max_row_len,column=len(self.atoms)+4,columnspan=2)
+
+		ttk.Separator(self, orient='vertical').grid(
+			row=0,column=len(self.atoms),rowspan=self.max_row_len+1,sticky='NS')
+
 		self.update()
 
 	def save(self):
 		self.parent.atom_selection = set(
 			[i for i,j in self.atoms.items() if j.get()])
+		self.parent.atom_uniq_selection = set(
+			[i for i,j in self.atoms_uniq.items() if j.get()])
 		self.parent.resi_selection = set(
 			[i for i,j in self.residues.items() if j.get()])
 		self.parent.seq_selection = set(
@@ -1672,6 +1718,7 @@ class DataTab(tk.Frame):
 	def parse_data(self):
 		data = self.parent.parent.parent.templates[self.dtype]
 		atom_selection = self.frm_pdb.atom_selection
+		atom_uniq_selection = self.frm_pdb.atom_uniq_selection
 		resi_selection = self.frm_pdb.resi_selection
 		seq_selection = self.frm_pdb.seq_selection
 
@@ -1693,7 +1740,8 @@ class DataTab(tk.Frame):
 					row['exp'] = exp
 					row['err'] = err
 					if ((atom.element in atom_selection) and 
-						(res in resi_selection) and (seq in seq_selection)):
+						(res in resi_selection) and (seq in seq_selection)
+						and (atm in atom_uniq_selection)):
 						row['use'] = True
 
 			unused = set(self.loadData.data) - usedKeys
@@ -2584,6 +2632,7 @@ class MethodsNotebook(ttk.Notebook):
 
 	def make_templates(self):
 		self.atomSet = set([])
+		self.atom_uniqSet = set([])
 		templates = {i:[] for i in self.dtypes}
 		if not self.frm_pdb.prot:
 			return
@@ -2594,6 +2643,7 @@ class MethodsNotebook(ttk.Notebook):
 			templates['RDC'].append(
 				(m, False, a, None, nan, nan, nan, a.serial_number))
 			self.atomSet.add(a.element)
+			self.atom_uniqSet.add(a.name)
 
 		for dtype in self.dtypes:
 			template = np.array(templates[dtype], dtype=self.structdtype[dtype])
@@ -2602,9 +2652,13 @@ class MethodsNotebook(ttk.Notebook):
 		self.templates['CCR'] = self.templates['RDC'].copy()
 
 		old_atomNames = set(self.frm_pdb.default_atom_selection)
+		old_atom_uniqNames = set(self.frm_pdb.default_atom_uniq_selection)
 		new_atomNames = self.atomSet - old_atomNames
+		new_atom_uniqNames = self.atom_uniqSet - old_atom_uniqNames
 		self.frm_pdb.atom_selection |= new_atomNames
+		self.frm_pdb.atom_uniq_selection |= new_atom_uniqNames
 		self.frm_pdb.default_atom_selection = list(self.atomSet)
+		self.frm_pdb.default_atom_uniq_selection = list(self.atom_uniqSet)
 
 
 class CSAFrame(tk.LabelFrame):
@@ -2675,10 +2729,12 @@ class PDBFrame(tk.LabelFrame):
 		self.models = set([])
 
 		self.default_atom_selection = ['H','N','C','O']
+		self.default_atom_uniq_selection = ['H1','N1','C1','O1']
 		self.default_resi_selection = list(protein.standard_aa_names)
 		self.default_seq_selection = list(range(1,10))
 
 		self.atom_selection = set(self.default_atom_selection)
+		self.atom_uniq_selection = set(self.default_atom_uniq_selection)
 		self.resi_selection = set(self.default_resi_selection)
 		self.seq_selection = set(self.default_seq_selection)
 		self.reset_selection()
@@ -2737,6 +2793,7 @@ class PDBFrame(tk.LabelFrame):
 
 	def reset_selection(self):
 		self.atom_selection = set(self.default_atom_selection)
+		self.atom_uniq_selection = set(self.default_atom_uniq_selection)
 		self.resi_selection = set(self.default_resi_selection)
 		self.seq_selection = set(self.default_seq_selection)
 
