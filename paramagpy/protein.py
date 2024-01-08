@@ -527,7 +527,6 @@ def convert_xyz(fileName, ident=None):
 	for pat in patt:
 		if pat[0] == "N":
 			ligand = pat
-			#print(ligand)
 	
 	# Process atom labeling
 	distinct_atoms = dict()
@@ -571,7 +570,7 @@ def convert_xyz(fileName, ident=None):
 	with open(output_pdb, "w") as pdb:
 		for i, row in enumerate(rows):
 			pdb.write("{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {:>2s}{:2s}\n".format(
-				"ATOM", i+1, row.label, " ", "SER", "X", row.res, "", row.x, row.y, row.z, 1.00, 0.00, row.atom, ""))
+				"ATOM", i+1, row.label, " ", "ASP", "X", row.res, "", row.x, row.y, row.z, 1.00, 0.00, row.atom, ""))
 		return output_pdb, 0
 
 
