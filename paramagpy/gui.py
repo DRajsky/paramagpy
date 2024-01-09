@@ -794,6 +794,54 @@ class SelectionPopup(Popup):
 		self.death()
 
 
+class AveragePopup(Popup):
+	"""A popup allowing selection of averaged atoms"""
+	def __init__(self, parent):
+		title = "Averaged atoms"
+		super().__init__(parent, title)
+		self.groups = list()
+
+		tk.Label(self, text="Groups:").grid(row=0,column=0,columnspan=2,sticky='W')
+		ttk.Button(self, text='Add group', command=self.addgroup).grid(
+			row=1,column=0,columnspan=2)
+		ttk.Button(self, text='Remove group', command=self.remgroup).grid(
+			row=1,column=2,columnspan=2)
+
+		self.vert = ttk.Separator(self, orient='vertical')
+		self.vert_sep()
+
+		tk.Label(self, text="Atoms:").grid(row=0,column=5,columnspan=2,sticky='W')
+		for i, seq in enumerate(self.parent.data):
+			ttk.Button(self, text=seq,command=lambda s=seq: self.add(s)
+				).grid(row=1+i%9,column=5+i//9, sticky='W')
+			#print(seq, self.parent.data[seq])
+
+		ttk.Button(self, text='Cancel', command=self.death).grid(row=20,column=0,columnspan=2)
+		#ttk.Button(self, text='Save', command=self.save).grid(row=1,column=2,columnspan=2)
+		self.update()
+	
+	def addgroup(self):
+		b_add =	ttk.Button(self,text=len(self.groups), command=lambda : print("AAA"))
+		b_add.grid(row=2+len(self.groups),column=0)
+		self.vert_sep()
+		self.groups.append(b_add)
+
+	def remgroup(self):
+		if len(self.groups) == 0:
+			return
+		b_rem = self.groups[len(self.groups)-1]
+		b_rem.destroy()
+		self.vert_sep() 
+		self.groups.pop()
+
+	def vert_sep(self):
+		self.vert.grid(
+			row=0,column=4,rowspan=10+len(self.groups),sticky='NS')
+
+	def add(self, seq):
+		print(self.parent.data[seq])
+
+
 class ErrorSimulationPopup(Popup):
 	"""A popup allowing atom and residue selection for experimental data"""
 	def __init__(self, parent):
@@ -1010,7 +1058,7 @@ class DataLoad(tk.LabelFrame):
 		self.currentFile = None
 
 		ttk.Button(self, text='Read {} Data'.format(self.dtype),
-			command=self.load_data).grid(row=0,column=0)
+			command=self.load_data).grid(row=0,column=0,sticky='W')
 
 		self.lbl_dataFile = tk.Label(self, text=" "*self.pathWidth)
 		self.lbl_dataFile.grid(row=0,column=1,columnspan=3)
@@ -1025,8 +1073,8 @@ class DataLoad(tk.LabelFrame):
 		self.fields['mag'] = NumericEntry(self, parse, 
 			disp, onlyPositive=True, formatter="{:.1f}")
 		self.fields['mag'].label = tk.Label(self, text='B0/MHz')
-		self.fields['mag'].label.grid(row=1,column=0)
-		self.fields['mag'].grid(row=1,column=1)
+		self.fields['mag'].label.grid(row=2,column=0)
+		self.fields['mag'].grid(row=2,column=1)
 
 		def parse(value):
 			self.parent.tensorStart.tensor.temperature = value
@@ -1036,28 +1084,32 @@ class DataLoad(tk.LabelFrame):
 		self.fields['tem'] = NumericEntry(self, parse, 
 			disp, onlyPositive=True, formatter="{:.2f}")
 		self.fields['tem'].label = tk.Label(self, text='Temp./K')
-		self.fields['tem'].label.grid(row=1,column=2)
-		self.fields['tem'].grid(row=1,column=3)
+		self.fields['tem'].label.grid(row=2,column=2)
+		self.fields['tem'].grid(row=2,column=3)
+
+		if self.dtype=='PCS':
+			ttk.Button(self, text='Manage averaged atoms',
+			command=self.average_atoms).grid(row=1,column=0,columnspan=2,sticky='W')
 
 		if self.dtype=='PRE':
 			tk.Label(self, text='Relaxation Type:').grid(row=2,column=0)
 			self.rtype_var = tk.StringVar(value='r2')
 			ttk.Radiobutton(self, text='R1', variable=self.rtype_var, 
-				value='r1').grid(row=2,column=1, sticky='W')
+				value='r1').grid(row=3,column=1, sticky='W')
 			ttk.Radiobutton(self, text='R2', variable=self.rtype_var, 
-				value='r2').grid(row=2,column=2, sticky='W')
+				value='r2').grid(row=3,column=2, sticky='W')
 
 		elif self.dtype in ['RDC','CCR']:
 			self.show_pair_var = tk.BooleanVar(value=False)
 			ttk.Checkbutton(self, text='Show Custom Atoms', variable=self.show_pair_var, 
 				command=self.show_pair_change,
-				).grid(row=2,column=0, columnspan=2, sticky='W')
+				).grid(row=3,column=0, columnspan=2, sticky='W')
 			self.pair_entry1 = CustomTextDefaultEntry(self, "H",
 				returnKey=self.show_pair_change, mode='atoms', width=4)
-			self.pair_entry1.grid(row=2,column=2, columnspan=1, sticky='W')
+			self.pair_entry1.grid(row=3,column=2, columnspan=1, sticky='W')
 			self.pair_entry2 = CustomTextDefaultEntry(self, "N",
 				returnKey=self.show_pair_change, mode='atoms', width=4)
-			self.pair_entry2.grid(row=2,column=3, columnspan=1, sticky='W')
+			self.pair_entry2.grid(row=3,column=3, columnspan=1, sticky='W')
 
 	def rtype(self):
 		if self.dtype=='PRE':
@@ -1096,6 +1148,13 @@ class DataLoad(tk.LabelFrame):
 		self.lbl_dataFile.config(text=format_path(fileName, self.pathWidth))
 		self.currentFile = fileName
 		self.parent.update(2)
+
+	def average_atoms(self):
+		if not self.data:
+			messagebox.showerror("Error", "PCS data missing")
+		else:
+			AveragePopup(self)
+			self.parent.update(2)
 
 
 class Treeviewer(ttk.Treeview):
