@@ -800,29 +800,42 @@ class AveragePopup(Popup):
 		title = "Averaged atoms"
 		super().__init__(parent, title)
 		self.groups = list()
+		self.option = tk.IntVar()
+		self.option.set(-1)
+		self.atoms = list()
 
 		tk.Label(self, text="Groups:").grid(row=0,column=0,columnspan=2,sticky='W')
 		ttk.Button(self, text='Add group', command=self.addgroup).grid(
-			row=1,column=0,columnspan=2)
+			row=1,column=0,columnspan=2,sticky='W')
 		ttk.Button(self, text='Remove group', command=self.remgroup).grid(
-			row=1,column=2,columnspan=2)
+			row=1,column=2,columnspan=2,sticky='W')
 
 		self.vert = ttk.Separator(self, orient='vertical')
 		self.vert_sep()
 
 		tk.Label(self, text="Atoms:").grid(row=0,column=5,columnspan=2,sticky='W')
 		for i, seq in enumerate(self.parent.data):
-			ttk.Button(self, text=seq,command=lambda s=seq: self.add(s)
-				).grid(row=1+i%9,column=5+i//9, sticky='W')
-			#print(seq, self.parent.data[seq])
+			self.atoms.append(ttk.Button(self,text=seq,command=lambda s=seq, pos=i: self.add(s, pos)))
+			self.atoms[i].grid(row=1+i%9,column=5+i//9, sticky='W')
 
-		ttk.Button(self, text='Cancel', command=self.death).grid(row=20,column=0,columnspan=2)
-		#ttk.Button(self, text='Save', command=self.save).grid(row=1,column=2,columnspan=2)
+		ttk.Button(self,text='Cancel',command=self.death).grid(row=100,column=0,columnspan=2,sticky='W')
+		#ttk.Button(self, text='Save', command=self.save).grid(row=1,column=2,columnspan=2,sticky='W')
 		self.update()
 	
 	def addgroup(self):
-		b_add =	ttk.Button(self,text=len(self.groups), command=lambda : print("AAA"))
-		b_add.grid(row=2+len(self.groups),column=0)
+		b_add =	{}
+		b_add['Select'] = (ttk.Radiobutton(self,text=len(self.groups),var=self.option,value=len(self.groups)))
+		b_add['Select'].invoke()
+		b_add['Button'] = (ttk.Button(self,text="AAAA",command=lambda : print("BBB")))
+		b_add['Title'] = tk.StringVar()
+		b_add['Title'].set("")
+		b_add['Group'] = list()
+		b_add['Label'] = ttk.Label(self,textvariable=b_add['Title'],anchor='w',justify='left')
+		widg_col = 0
+		for widget in b_add:
+			if widget not in ('Title', 'Group'):
+				b_add[widget].grid(row=2+len(self.groups),column=widg_col)
+				widg_col += 1
 		self.vert_sep()
 		self.groups.append(b_add)
 
@@ -830,16 +843,26 @@ class AveragePopup(Popup):
 		if len(self.groups) == 0:
 			return
 		b_rem = self.groups[len(self.groups)-1]
-		b_rem.destroy()
+		for i, widget in enumerate(b_rem):
+			if widget not in ('Title', 'Group'):
+				b_rem[widget].destroy()
 		self.vert_sep() 
 		self.groups.pop()
+		self.option.set(-1)
 
 	def vert_sep(self):
 		self.vert.grid(
 			row=0,column=4,rowspan=10+len(self.groups),sticky='NS')
 
-	def add(self, seq):
-		print(self.parent.data[seq])
+	def add(self, seq, pos):
+		if self.option.get() == -1:
+			messagebox.showerror("Error", "No group selected!")
+		else:
+			if seq not in self.groups[self.option.get()]['Group']:
+				self.groups[self.option.get()]['Group'].append(seq)
+				self.groups[self.option.get()]['Title'].set(
+					str(self.groups[self.option.get()]['Group']))
+				self.atoms[pos].state(['disabled'])
 
 
 class ErrorSimulationPopup(Popup):
