@@ -865,6 +865,56 @@ class AveragePopup(Popup):
 				self.atoms[pos].state(['disabled'])
 
 
+class ResiduePopup(Popup):
+	"""A popup to select residues from xyz file"""
+	def __init__(self, parent):
+		title = "Residue selection"
+		super().__init__(parent, title)
+		self.atoms = list()
+		for at in protein.PERIODIC_TABLE:
+			self.atoms.append(protein.PERIODIC_TABLE[at][1])
+		self.reg = (self.register(self.length_valid), '%P')
+		self.res_start = tk.StringVar()
+		self.res_start.set("")
+		self.res_length = tk.IntVar()
+		self.res_length.set(0)
+		self.res_start.trace("w",self.set_ligand)
+		self.res_length.trace("w",self.set_ligand)
+
+		tk.Label(self, text="Residue start").grid(row=0,column=0,columnspan=2,sticky='W')
+		res_entry = ttk.Combobox(self, textvariable=self.res_start)
+		res_entry['values'] = self.atoms
+		res_entry.state(["readonly"])
+		res_entry.grid(row=1,column=0,columnspan=2,sticky='W')
+
+		tk.Label(self, text="Number of residues").grid(row=2,column=0,columnspan=2,sticky='W')
+		len_entry = tk.Entry(self, textvariable=self.res_length, width=20, validate="key", 
+              validatecommand=self.reg)
+		len_entry.grid(row=3,column=0,columnspan=2,sticky='W')
+
+		tk.Label(self, text="Residue:").grid(row=4,column=0,columnspan=2,sticky='W')
+		tk.Label(self, textvariable=parent.res_ligand).grid(row=5,column=0,columnspan=4,sticky='W')
+	
+		ttk.Button(self,text='Save',command=self.death).grid(row=100,column=0,columnspan=2,sticky='W')
+		ttk.Button(self,text='Cancel',command=self.cancel).grid(row=100,column=2,columnspan=2,sticky='W')
+
+		self.update()
+
+	def length_valid(self, S):
+		return S.isdigit()
+
+	def set_ligand(self, *args):
+		if (self.res_start.get() == "") or (self.res_length.get() == 0):
+			self.parent.res_ligand.set("")
+		else:
+			self.parent.res_ligand.set(self.parent.xyz.pattern_find(
+				self.res_start.get(), self.res_length.get()))
+
+	def cancel(self):
+		self.parent.res_ligand.set("")
+		self.death()
+
+
 class ErrorSimulationPopup(Popup):
 	"""A popup allowing atom and residue selection for experimental data"""
 	def __init__(self, parent):
@@ -1111,7 +1161,7 @@ class DataLoad(tk.LabelFrame):
 		self.fields['tem'].grid(row=2,column=3)
 
 		if self.dtype=='PCS':
-			ttk.Button(self, text='Manage averaged atoms',
+			ttk.Button(self, text='Manage Averaged Atoms',
 			command=self.average_atoms).grid(row=1,column=0,columnspan=2,sticky='W')
 
 		if self.dtype=='PRE':
@@ -2836,7 +2886,6 @@ class PDBFrame(tk.LabelFrame):
 		ttk.Separator(self, orient='vertical').grid(
 			row=0,column=2,rowspan=2,sticky='NS',padx=3)
 
-		# tk.Label(self, text="Models for pdb:").grid(row=1, column=0)
 		b = ttk.Button(self, text='Set Models', 
 			command=self.parse_models)
 		Tooltip(b, tt['parse_models'])
@@ -2857,7 +2906,6 @@ class PDBFrame(tk.LabelFrame):
 
 		self.frm_csa = CSAFrame(self)
 		b = ttk.Button(self, text='Set CSA',command=self.set_csa)
-		# Tooltip(b, tt['selection'])
 		b.grid(row=0,column=8,sticky='EW')
 
 	def has_models(self):
@@ -2905,16 +2953,33 @@ class PDBFrame(tk.LabelFrame):
 			filetypes=[('XYZ file','.xyz'),('All files','.*')])
 
 		if fileName:
-			output_pdb, state = protein.convert_xyz(fileName)
+			self.xyz = protein.XyzConvert(fileName)
+			
+			state =	self.xyz.check_pdb()
 			while state != 0:
 				if messagebox.askokcancel(title="Confirmation", message="PDB file already exists. Do you want to rewrite it?"):
-					os.remove(output_pdb)
-					output_pdb, state = protein.convert_xyz(fileName)
+					os.remove(self.xyz.output_pdb)
+					state = self.xyz.check_pdb()
 				else:
 					return
 
+			self.xyz.convert_xyz()
+			self.res_ligand = tk.StringVar()
+			self.res_ligand.set("")
+			res_pop = ResiduePopup(self)
+			self.wait_window(res_pop)
+
+			if (self.res_ligand.get() == ""):
+				messagebox.showerror("Error", 
+				"Values selected incorrectly, aborting.")
+				return
+
+			self.lig_list = [x.strip("()'") for x in self.res_ligand.get().split(", ")]
+			self.xyz.labeling(self.lig_list)
+			self.xyz.pdb_output()
+
 			if messagebox.askokcancel(title="Confirmation", message="Do you want to load the PDB file?"):
-				self.read_file(output_pdb)
+				self.read_file(self.xyz.output_pdb)
 
 	def parse_models(self):
 		"""
