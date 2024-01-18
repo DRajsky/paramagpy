@@ -661,12 +661,13 @@ class XyzConvert:
 	def labeling(self, ligand):
 		# Process atom labeling
 		distinct_atoms = dict()
-		residue = 0 
+		residue = [0, -1]
 		for i, row in enumerate(self.rows):
 			# If current atom can be the start of the pattern
+			residue[1] -= 1
 			if row.atom == ligand[0]:
-				lig_eq = True
 				# Check wheter the atom is start of pattern
+				lig_eq = True
 				try:
 					for j, at in enumerate(ligand):
 						if not at == self.rows[i+j].atom:
@@ -676,10 +677,16 @@ class XyzConvert:
 				
 				# If start of pattern, reset atom label count and start new residue
 				if lig_eq == True:
-					residue += 1
+					residue[0] += 1
+					residue[1] = len(ligand)+1
 					for x in distinct_atoms:
 						if x in ligand:
 							distinct_atoms[x] = 0
+
+			# If at the end of last residue, up the count
+			if residue[1] == 0:
+				residue[0] += 1
+				residue[1] = -1
 
 			# Add new atoms to dictionary
 			if row.atom not in distinct_atoms:
@@ -691,7 +698,7 @@ class XyzConvert:
 
 			# Finally, change the labels accordingly        
 			self.rows[i].label += str(distinct_atoms[row.atom])
-			self.rows[i].res = residue
+			self.rows[i].res = residue[0]
 	
 	def pdb_output(self):
 		with open(self.output_pdb, "w") as pdb:
