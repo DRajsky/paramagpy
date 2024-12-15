@@ -496,7 +496,7 @@ class PlotCorrelationPopup(Popup):
 
 		self.frm_mff = MultipleFitFrame(self.parent.parent.parent, 
 			state='plotting', root=self.frm_opt)
-		self.frm_mff.grid(row=0,column=0, rowspan=4, sticky='EW')
+		self.frm_mff.grid(row=0,column=0, rowspan=5, sticky='EW')
 
 		self.params['leg'] = tk.IntVar(value=0)
 		chk = ttk.Checkbutton(self.frm_opt, text="Include Legend",
@@ -514,8 +514,12 @@ class PlotCorrelationPopup(Popup):
 		chk = ttk.Checkbutton(self.frm_opt, text="Average Models",
 			variable=self.params['avg']).grid(row=3,column=2, sticky='W')
 
+		self.params['ttl'] = tk.StringVar(value='')
+		chk = ttk.Label(self.frm_opt, text="Title: ").grid(row=4,column=0, sticky='W')
+		chk = ttk.Entry(self.frm_opt, textvariable=self.params['ttl']).grid(row=4,column=1, columnspan=3, sticky='W')
+
 		ttk.Button(self.frm_opt, text='\u2193   Re-plot   \u2193', 
-			command=self.plot).grid(row=4,column=0,columnspan=4,sticky='EW')
+			command=self.plot).grid(row=5,column=0,columnspan=4,sticky='EW')
 
 		self.fig = Figure(figsize=(5, 5), dpi=100, tight_layout=True)
 		self.axes = self.fig.add_subplot(111)
@@ -550,6 +554,7 @@ class PlotCorrelationPopup(Popup):
 		self.axes.set_xlabel("Experiment [ppm]")
 		self.axes.set_ylabel("Calculated [ppm]")
 		self.axes.format_coord = self.format_coord
+		self.title(self.params['ttl'])
 
 		minig, maxig = None, None
 
@@ -590,7 +595,8 @@ class PlotCorrelationPopup(Popup):
 					_, mdl, chn, (_, seq, _), (atm, _) = atom.get_full_id()
 					lab = str(seq)+"-"+atm
 					texts.append(self.axes.text(exp, cal, lab, fontsize=8, ha='center', va='center'))
-				adjust_text(texts, d['exp'], d['cal'], arrowprops=dict(arrowstyle='->', color='red', lw=0.5))
+				#adjust_text(texts, d['exp'], d['cal'], arrowprops=dict(arrowstyle='->', color='red', lw=0.5))
+				adjust_text(texts, d['exp'], d['cal'])
 
 			if self.params['leg'].get():
 				self.axes.legend(bbox_to_anchor=(0.95,0.05), loc="lower right")
@@ -799,15 +805,16 @@ class AveragePopup(Popup):
 	def __init__(self, parent):
 		title = "Averaged atoms"
 		super().__init__(parent, title)
+		self.parent = parent
 		self.groups = list()
 		self.option = tk.IntVar()
 		self.option.set(-1)
-		self.atoms = list()
+		self.atoms = {}
 
 		tk.Label(self, text="Groups:").grid(row=0,column=0,columnspan=2,sticky='W')
 		ttk.Button(self, text='Add group', command=self.addgroup).grid(
 			row=1,column=0,columnspan=2,sticky='W')
-		ttk.Button(self, text='Remove group', command=self.remgroup).grid(
+		ttk.Button(self, text='Remove last group', command=self.remgroup).grid(
 			row=1,column=2,columnspan=2,sticky='W')
 
 		self.vert = ttk.Separator(self, orient='vertical')
@@ -815,18 +822,20 @@ class AveragePopup(Popup):
 
 		tk.Label(self, text="Atoms:").grid(row=0,column=5,columnspan=2,sticky='W')
 		for i, seq in enumerate(self.parent.data):
-			self.atoms.append(ttk.Button(self,text=seq,command=lambda s=seq, pos=i: self.add(s, pos)))
-			self.atoms[i].grid(row=1+i%9,column=5+i//9, sticky='W')
+			self.atoms[seq] = ttk.Button(self,text=seq,command=lambda s=seq, pos=i: self.add(s, pos))
+			self.atoms[seq].grid(row=1+i%12,column=5+i//12, sticky='W')
 
-		ttk.Button(self,text='Cancel',command=self.death).grid(row=100,column=0,columnspan=2,sticky='W')
-		#ttk.Button(self, text='Save', command=self.save).grid(row=1,column=2,columnspan=2,sticky='W')
+		ttk.Button(self, text='Save', command=self.save).grid(row=100,column=0,columnspan=2,sticky='W')
+		ttk.Button(self,text='Cancel',command=self.death).grid(row=100,column=2,columnspan=2,sticky='W')
+		ttk.Button(self, text='Save file', command=self.save_file).grid(row=100,column=4,columnspan=2,sticky='W')
+		ttk.Button(self,text='Load file',command=self.load_file).grid(row=100,column=6,columnspan=2,sticky='W')
 		self.update()
 	
 	def addgroup(self):
 		b_add =	{}
 		b_add['Select'] = (ttk.Radiobutton(self,text=len(self.groups),var=self.option,value=len(self.groups)))
 		b_add['Select'].invoke()
-		b_add['Button'] = (ttk.Button(self,text="AAAA",command=lambda : print("BBB")))
+		b_add['Button'] = (ttk.Button(self,text="Remove atoms",command=lambda grp=len(self.groups): self.rem(grp)))
 		b_add['Title'] = tk.StringVar()
 		b_add['Title'].set("")
 		b_add['Group'] = list()
@@ -843,6 +852,9 @@ class AveragePopup(Popup):
 		if len(self.groups) == 0:
 			return
 		b_rem = self.groups[len(self.groups)-1]
+		for at in self.atoms:
+			if at in b_rem['Group']:
+				self.atoms[at]['state'] = tk.NORMAL
 		for i, widget in enumerate(b_rem):
 			if widget not in ('Title', 'Group'):
 				b_rem[widget].destroy()
@@ -857,12 +869,34 @@ class AveragePopup(Popup):
 	def add(self, seq, pos):
 		if self.option.get() == -1:
 			messagebox.showerror("Error", "No group selected!")
-		else:
-			if seq not in self.groups[self.option.get()]['Group']:
-				self.groups[self.option.get()]['Group'].append(seq)
-				self.groups[self.option.get()]['Title'].set(
-					str(self.groups[self.option.get()]['Group']))
-				self.atoms[pos].state(['disabled'])
+			return
+		if seq not in self.groups[self.option.get()]['Group']:
+			self.groups[self.option.get()]['Group'].append(seq)
+			self.groups[self.option.get()]['Title'].set(
+				str(self.groups[self.option.get()]['Group']))
+			self.atoms[seq]['state'] = tk.DISABLED
+
+	def rem(self, grp):
+		if not self.groups[grp]['Group']:
+			messagebox.showerror("Error", "This group is empty!")
+			return
+		print(self.groups[grp]['Group'])
+	
+	def save(self):
+		self.parent.average = {}
+		for i, grp in enumerate(self.groups):
+			self.parent.average[i] = grp['Group']
+		self.death()
+
+	def save_file(self):
+		fileName = "test.grp"
+		with open(fileName, 'w') as f:
+			for i, grp in enumerate(self.groups):
+				f.write(str(i))
+				f.write(str(grp['Group']))
+
+	def load_file(self):
+		print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 
 
 class ResiduePopup(Popup):
@@ -1129,6 +1163,7 @@ class DataLoad(tk.LabelFrame):
 		self.data = dataparse.DataContainer()
 		self.fields = {}
 		self.currentFile = None
+		self.average = None
 
 		ttk.Button(self, text='Read {} Data'.format(self.dtype),
 			command=self.load_data).grid(row=0,column=0,sticky='W')
@@ -2302,6 +2337,11 @@ class FittingOptionsFrame(tk.LabelFrame):
 				useracs=self.params['racs'].get(),
 				ensembleAverage=self.params['eav'].get(),
 				progress=progVar)
+		
+		# Averaging of selected atoms
+		if not self.parent.ntb_data.current_tab.loadData.average is None:
+			print(calcs)
+			print(self.parent.ntb_data.current_tab.loadData.average)
 
 		progbar.death()
 
