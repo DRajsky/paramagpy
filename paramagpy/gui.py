@@ -486,7 +486,7 @@ class PlotCorrelationPopup(Popup):
 		self.dtype = parent.dtype
 		self.curdir = self.parent.loadData.currentDir()
 		rcParams["savefig.directory"] = self.curdir
-		# rcParams['savefig.dpi'] = 300
+		rcParams['savefig.dpi'] = 300
 		self.params = {}
 
 		self.frm_opt = tk.Frame(self)
@@ -496,7 +496,7 @@ class PlotCorrelationPopup(Popup):
 
 		self.frm_mff = MultipleFitFrame(self.parent.parent.parent, 
 			state='plotting', root=self.frm_opt)
-		self.frm_mff.grid(row=0,column=0, rowspan=5, sticky='EW')
+		self.frm_mff.grid(row=0,column=0,columnspan=2,rowspan=4, sticky='EW')
 
 		self.params['leg'] = tk.IntVar(value=0)
 		chk = ttk.Checkbutton(self.frm_opt, text="Include Legend",
@@ -515,11 +515,11 @@ class PlotCorrelationPopup(Popup):
 			variable=self.params['avg']).grid(row=3,column=2, sticky='W')
 
 		self.params['ttl'] = tk.StringVar(value='')
-		chk = ttk.Label(self.frm_opt, text="Title: ").grid(row=4,column=0, sticky='W')
-		chk = ttk.Entry(self.frm_opt, textvariable=self.params['ttl']).grid(row=4,column=1, columnspan=3, sticky='W')
+		chk = ttk.Label(self.frm_opt, text="Title: ").grid(row=4,column=0, sticky='E')
+		chk = ttk.Entry(self.frm_opt, textvariable=self.params['ttl']).grid(row=4,column=1,sticky='EW')
 
 		ttk.Button(self.frm_opt, text='\u2193   Re-plot   \u2193', 
-			command=self.plot).grid(row=5,column=0,columnspan=4,sticky='EW')
+			command=self.plot).grid(row=6,column=0,columnspan=4,sticky='EW')
 
 		self.fig = Figure(figsize=(5, 5), dpi=100, tight_layout=True)
 		self.axes = self.fig.add_subplot(111)
@@ -554,7 +554,7 @@ class PlotCorrelationPopup(Popup):
 		self.axes.set_xlabel("Experiment [ppm]")
 		self.axes.set_ylabel("Calculated [ppm]")
 		self.axes.format_coord = self.format_coord
-		self.title(self.params['ttl'])
+		self.axes.set_title(self.params['ttl'].get())
 
 		minig, maxig = None, None
 
