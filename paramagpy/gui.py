@@ -7,7 +7,7 @@ import os, sys, subprocess, shutil
 from pprint import pprint
 from collections import OrderedDict
 from math import sqrt
-from adjustText import adjust_text # For rearranging graph texts: https://github.com/Phlya/adjustText/wiki
+import textalloc as ta # For rearranging graph texts: https://github.com/ckjellson/textalloc
 import re
 
 import paramagpy
@@ -533,7 +533,6 @@ class PlotCorrelationPopup(Popup):
 		self.frm_mff.update()
 		self.plot()
 
-
 	def last_words(self, *args):
 		self.frm_mff.remove_traces()
 
@@ -594,9 +593,9 @@ class PlotCorrelationPopup(Popup):
 				for atom, exp, cal in d[['atm','exp','cal']]:
 					_, mdl, chn, (_, seq, _), (atm, _) = atom.get_full_id()
 					lab = str(seq)+"-"+atm
-					texts.append(self.axes.text(exp, cal, lab, fontsize=8, ha='center', va='center'))
-				#adjust_text(texts, d['exp'], d['cal'], arrowprops=dict(arrowstyle='->', color='red', lw=0.5))
-				adjust_text(texts, d['exp'], d['cal'])
+					texts.append(lab)
+				ta.allocate(self.axes, d['exp'], d['cal'], texts,
+					color='red', linewidth=0.5, avoid_label_lines_overlap=True)
 
 			if self.params['leg'].get():
 				self.axes.legend(bbox_to_anchor=(0.95,0.05), loc="lower right")
