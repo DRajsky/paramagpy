@@ -592,7 +592,13 @@ class PlotCorrelationPopup(Popup):
 				texts = []
 				for atom, exp, cal in d[['atm','exp','cal']]:
 					_, mdl, chn, (_, seq, _), (atm, _) = atom.get_full_id()
-					lab = str(seq)+"-"+atm
+					nam = ''
+					if seq in (1,2,3):
+						nam = 'B'
+					elif seq in (4,5,6):
+						nam = 'A'
+					#lab = str(seq)+"-"+atm  # Old naming system
+					lab = atm+nam
 					texts.append(lab)
 				ta.allocate(self.axes, d['exp'], d['cal'], texts,
 					color='red', linewidth=0.5, avoid_label_lines_overlap=True)
@@ -703,11 +709,11 @@ class SelectionPopup(Popup):
 		self.atoms_order = list()
 		for i, atom in enumerate(self.parent.default_atom_selection):
 			if atom in parent.atom_selection:
-				value = True
+				val = True
 			else:
-				value = False
+				val = False
 			number = protein.get_atomic_number(atom)
-			self.atoms[atom] = tk.BooleanVar(value=value)
+			self.atoms[atom] = tk.BooleanVar(value=val)
 			self.atoms_order.append(number)
 			self.atoms_nonordered[number] = self.atoms[atom], atom
 		self.atoms_order.sort()
@@ -723,20 +729,20 @@ class SelectionPopup(Popup):
 		self.max_row_len = 0
 		for i, atom_uniq in enumerate(self.parent.default_atom_uniq_selection):
 			if atom_uniq in parent.atom_uniq_selection:
-				value = True
+				val = True
 			else:
-				value = False
+				val = False
 
 			# Splits atom id into atom name and id number
 			proc_name = re.split('(\d+)',atom_uniq)
 			number = protein.get_atomic_number(proc_name[0])
-			self.atoms_uniq[atom_uniq] = tk.BooleanVar(value=value)
+			self.atoms_uniq[atom_uniq] = tk.BooleanVar(value=val)
 			if len(proc_name) == 1:
 				proc_name.append(0)
 				proc_name.append('')
 			if number not in self.atoms_uniq_nonordered:
 				self.atoms_uniq_nonordered[number] = {}
-			self.atoms_uniq_nonordered[number].update({int(proc_name[1]) : self.atoms_uniq[atom_uniq]})
+			self.atoms_uniq_nonordered[number].update({atom_uniq : self.atoms_uniq[atom_uniq]})
 		for i, x in enumerate(self.atoms_order):
 			order = list()
 			for y in self.atoms_uniq_nonordered[x]:
@@ -754,10 +760,10 @@ class SelectionPopup(Popup):
 		self.residues = {}
 		for i, residue in enumerate(protein.standard_aa_names):
 			if residue in parent.resi_selection:
-				value = True
+				val = True
 			else:
-				value = False
-			self.residues[residue] = tk.BooleanVar(value=value)
+				val = False
+			self.residues[residue] = tk.BooleanVar(value=val)
 			ttk.Checkbutton(self, text=residue,variable=self.residues[residue]
 				).grid(row=i%4+1,column=len(self.atoms)+1+i//4, sticky='W',padx=4)
 
@@ -768,10 +774,10 @@ class SelectionPopup(Popup):
 		self.sequences = {}
 		for i in range(1,10):
 			if i in parent.seq_selection:
-				value = True
+				val = True
 			else:
-				value = False
-			self.sequences[i] = tk.BooleanVar(value=value)
+				val = False
+			self.sequences[i] = tk.BooleanVar(value=val)
 			ttk.Checkbutton(self, text=str(i),variable=self.sequences[i]
 				).grid(row=(i-1)%3+7,column=len(self.atoms)+1+(i-1)//3, sticky='W',padx=4)
 
@@ -809,6 +815,7 @@ class AveragePopup(Popup):
 		self.option = tk.IntVar()
 		self.option.set(-1)
 		self.atoms = {}
+		self.loadSaved()
 
 		tk.Label(self, text="Groups:").grid(row=0,column=0,columnspan=2,sticky='W')
 		ttk.Button(self, text='Add group', command=self.addgroup).grid(
@@ -879,13 +886,26 @@ class AveragePopup(Popup):
 		if not self.groups[grp]['Group']:
 			messagebox.showerror("Error", "This group is empty!")
 			return
-		print(self.groups[grp]['Group'])
 	
 	def save(self):
-		self.parent.average = {}
-		for i, grp in enumerate(self.groups):
-			self.parent.average[i] = grp['Group']
+		self.parent.average = tuple()
+		#for i, grp in enumerate(self.groups):
+		#	self.parent.average[i] = grp['Group']
+		self.parent.average = (self.groups, self.atoms)
 		self.death()
+
+	# funguje, ale nezobrazuje
+	def loadSaved(self):
+		if len(self.parent.average) != 0:
+			self.groups = self.parent.average[0]
+			self.atoms = self.parent.average[1]
+
+		#for i, grp in enumerate(self.parent.average):
+		#	self.addgroup()
+		#	for at in grp:
+		#		self.groups[i]['Group'].append(at)
+		#		self.atoms[at]['state'] = tk.DISABLED
+		#	self.groups[i]['Title'].set(str(self.groups[i]['Group']))
 
 	def save_file(self):
 		fileName = "test.grp"
@@ -1162,7 +1182,7 @@ class DataLoad(tk.LabelFrame):
 		self.data = dataparse.DataContainer()
 		self.fields = {}
 		self.currentFile = None
-		self.average = None
+		self.average = tuple()
 
 		ttk.Button(self, text='Read {} Data'.format(self.dtype),
 			command=self.load_data).grid(row=0,column=0,sticky='W')
@@ -1965,6 +1985,19 @@ class DataTab(tk.Frame):
 				rads = self.tensorFit.tensor.fast_rads(poss)
 				pcss += rads
 			self.data['cal'] = pcss
+			# Averaging of selected atoms
+			if len(self.loadData.average) != 0:
+				for i in self.loadData.average[0]:
+					aver = 0.0
+					aver_grp = list()
+					for j in i['Group']:
+						for num, a in enumerate(self.data):
+							if j[0] == a['atm'].get_parent().get_id()[1] and j[1] == a['atm'].get_name():
+								aver += a['cal']
+								aver_grp.append(num)
+					aver /= len(i['Group'])
+					for num in aver_grp:
+							self.data[num]['cal'] = aver
 
 		elif self.dtype=='RDC':
 			vecs = []
@@ -2336,11 +2369,6 @@ class FittingOptionsFrame(tk.LabelFrame):
 				useracs=self.params['racs'].get(),
 				ensembleAverage=self.params['eav'].get(),
 				progress=progVar)
-		
-		# Averaging of selected atoms
-		if not self.parent.ntb_data.current_tab.loadData.average is None:
-			print(calcs)
-			print(self.parent.ntb_data.current_tab.loadData.average)
 
 		progbar.death()
 
