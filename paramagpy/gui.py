@@ -477,6 +477,7 @@ class PlotCorrelationPopup(Popup):
 			from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
 			from matplotlib.figure import Figure
 			from matplotlib import rcParams
+			from matplotlib.ticker import MaxNLocator
 		except ImportError:
 			print("You need to install matplotlib module for this function")
 			raise
@@ -514,12 +515,12 @@ class PlotCorrelationPopup(Popup):
 		chk = ttk.Checkbutton(self.frm_opt, text="Average Models",
 			variable=self.params['avg']).grid(row=3,column=2, sticky='W')
 
-		self.params['ttl'] = tk.StringVar(value='')
+		self.params['ttl'] = tk.StringVar(value='Title')
 		chk = ttk.Label(self.frm_opt, text="Title: ").grid(row=4,column=0, sticky='E')
 		chk = ttk.Entry(self.frm_opt, textvariable=self.params['ttl']).grid(row=4,column=1,sticky='EW')
 
 		ttk.Button(self.frm_opt, text='\u2193   Re-plot   \u2193', 
-			command=self.plot).grid(row=6,column=0,columnspan=4,sticky='EW')
+			command=self.plot).grid(row=5,column=0,columnspan=4,sticky='EW')
 
 		self.fig = Figure(figsize=(5, 5), dpi=100, tight_layout=True)
 		self.axes = self.fig.add_subplot(111)
@@ -528,6 +529,7 @@ class PlotCorrelationPopup(Popup):
 		self.canvas.get_tk_widget().pack()
 		self.toolbar = NavigationToolbar2Tk(self.canvas, self.frm_plt)
 		self.toolbar.update()
+		self.locator = MaxNLocator(nbins=7,steps=[1, 5, 10],integer=True)
 
 		self.update()
 		self.frm_mff.update()
@@ -550,10 +552,10 @@ class PlotCorrelationPopup(Popup):
 
 	def plot(self):
 		self.axes.clear()
-		self.axes.set_xlabel("Experiment [ppm]")
-		self.axes.set_ylabel("Calculated [ppm]")
+		self.axes.set_xlabel("Experiment [ppm]",verticalalignment='baseline',labelpad=10.0)
+		self.axes.set_ylabel("Calculated [ppm]",verticalalignment='baseline',labelpad=5.0)
+		self.axes.set_title(self.params['ttl'].get(),y=1.0,verticalalignment='baseline')
 		self.axes.format_coord = self.format_coord
-		self.axes.set_title(self.params['ttl'].get())
 
 		minig, maxig = None, None
 
@@ -581,12 +583,8 @@ class PlotCorrelationPopup(Popup):
 			erbar = self.axes.errorbar(d['exp'],d['cal'],xerr=d['err'],marker='o', 
 				lw=0, elinewidth=1, ms=3, label=statlabel, color=tab.colour.colour)
 
-			scale = 1.1
-			self.axes.plot([minig*scale,maxig*scale], 
-						   [minig*scale,maxig*scale], '-k', lw=0.5, zorder=0)
-			self.axes.set_xlim(minig*scale, maxig*scale)
-			self.axes.set_ylim(minig*scale, maxig*scale)
-			self.axes.set_aspect(1.0)
+			scale = 1.4 # Higher, so the data labels have space to be placed
+			xy_line = np.array([minig*scale, maxig*scale])
 
 			if self.params['ann'].get():
 				texts = []
@@ -600,8 +598,11 @@ class PlotCorrelationPopup(Popup):
 					#lab = str(seq)+"-"+atm  # Old naming system
 					lab = atm+nam
 					texts.append(lab)
-				ta.allocate(self.axes, d['exp'], d['cal'], texts,
-					color='red', linewidth=0.5, avoid_label_lines_overlap=True)
+				ta.allocate(self.axes, d['exp'], d['cal'], texts, x_lines=[xy_line],
+					y_lines=[xy_line], color='red', textsize=9, linewidth=0.5,
+					avoid_crossing_label_lines=False, min_distance=0.02, margin=0.005,
+					max_distance=0.4, x_scatter=d['exp'], y_scatter=d['cal'],
+					avoid_label_lines_overlap=True, nbr_candidates=200, priority_strategy='largest')
 
 			if self.params['leg'].get():
 				self.axes.legend(bbox_to_anchor=(0.95,0.05), loc="lower right")
@@ -613,6 +614,13 @@ class PlotCorrelationPopup(Popup):
 					transform=self.axes.transAxes, horizontalalignment='left', 
 					verticalalignment='top')
 
+			self.axes.plot(xy_line, xy_line, '-k', lw=0.5, zorder=0)
+			self.axes.set_xlim(xy_line)
+			self.axes.set_ylim(xy_line)
+			self.axes.xaxis.set_major_locator(self.locator)
+			self.axes.yaxis.set_major_locator(self.locator)
+			self.axes.set_aspect(1.0, anchor='NW')
+		#self.fig.subplots_adjust(wspace=1, hspace=1, top=0.925, bottom=0.1, left=0.16, right=0.95) # So every plot has the same size
 		self.canvas.draw()
 
 
