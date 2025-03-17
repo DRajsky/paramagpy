@@ -1907,7 +1907,7 @@ class Metal(object):
 		pre_mesh = self.fast_pre(flat, gamarr, rtype=rtype, dsa=dsa, sbm=sbm)
 		return pre_mesh.reshape(*og_shape)
 
-	def write_pymol_script(self, isoval=1.0, surfaceName='isomap', 
+	def write_pymol_script(self, isoval=4.0, surfaceName='isomap', 
 		scriptName='isomap.pml', meshName='./isomap.pml.ccp4', pdbFile=None):
 		"""
 		Write a PyMol script to file which allows loading of the 
@@ -1939,8 +1939,8 @@ class Metal(object):
 		s += "cmd.load(meshfile, 'isomap', 1, 'ccp4')\n"
 		s += "isosurface {}, isomap, {}\n".format(posname,isoval)
 		s += "isosurface {}, isomap, {}\n".format(negname,-isoval)
-		s += "set transparency, 0.5, {}\n".format(posname)
-		s += "set transparency, 0.5, {}\n".format(negname)
+		s += "#set transparency, 0.5, {}\n".format(posname)
+		s += "#set transparency, 0.5, {}\n".format(negname)
 		s += "set surface_color, blue, {}\n".format(posname)
 		s += "set surface_color, red, {}\n".format(negname)
 		s += "pseudoatom {}, pos={}\n".format(oriname,list(self.position*1E10))
@@ -1950,7 +1950,7 @@ class Metal(object):
 			protName = ntpath.basename(pdbFile).replace('.pdb','')
 			s += "cmd.load(os.path.join(curdir, '{}'),'{}')\n".format(
 				pdbFile, protName)
-			s += "show_as cartoon, {}\n".format(protName)
+			s += "show_as sticks, {}\n".format(protName)
 		with open(scriptName, 'w') as o:
 			o.write(s)
 			print("{} script written".format(scriptName))
