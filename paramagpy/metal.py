@@ -1907,7 +1907,7 @@ class Metal(object):
 		pre_mesh = self.fast_pre(flat, gamarr, rtype=rtype, dsa=dsa, sbm=sbm)
 		return pre_mesh.reshape(*og_shape)
 
-	def write_pymol_script(self, isoval=4.0, surfaceName='isomap', 
+	def write_pymol_script(self, isoval=100.0, surfaceName='isomap', 
 		scriptName='isomap.pml', meshName='./isomap.pml.ccp4', pdbFile=None):
 		"""
 		Write a PyMol script to file which allows loading of the 
@@ -1934,13 +1934,16 @@ class Metal(object):
 		s += self.info()+'\n'
 		s += "import os, pymol\n"
 		s += "curdir = os.path.dirname(pymol.__script__)\n"
+		s += "turn x, 90\n"
+		s += "move z, -50\n"
 		s += "set normalize_ccp4_maps, off\n"
 		s += "meshfile = os.path.join(curdir, '{}')\n".format(meshName)
 		s += "cmd.load(meshfile, 'isomap', 1, 'ccp4')\n"
 		s += "isosurface {}, isomap, {}\n".format(posname,isoval)
 		s += "isosurface {}, isomap, {}\n".format(negname,-isoval)
-		s += "#set transparency, 0.5, {}\n".format(posname)
-		s += "#set transparency, 0.5, {}\n".format(negname)
+		s += "set use_shaders, 0\n"
+		s += "set transparency, 0.5, {}\n".format(posname)
+		s += "set transparency, 0.5, {}\n".format(negname)
 		s += "set surface_color, blue, {}\n".format(posname)
 		s += "set surface_color, red, {}\n".format(negname)
 		s += "pseudoatom {}, pos={}\n".format(oriname,list(self.position*1E10))
@@ -1995,7 +1998,7 @@ class Metal(object):
 
 			print("{} mesh written".format(fileName))
 
-	def isomap(self, protein=None, isoval=1.0, **kwargs):
+	def isomap(self, protein=None, isoval=100.0, **kwargs):
 		mesh, bounds = self.make_mesh(**kwargs)
 		pcs_mesh = self.pcs_mesh(mesh)
 		self.write_isomap(pcs_mesh, bounds)
